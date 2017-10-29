@@ -2,10 +2,10 @@ package network
 
 import (
 	"bufio"
-	"sync"
-	"net"
 	"encoding/binary"
 	"io"
+	"net"
+	"sync"
 	"time"
 
 	"github.com/ruiqihong/paxos/log"
@@ -18,19 +18,19 @@ type AddrData struct {
 
 type ConnErr struct {
 	Addr string
-	Err error
+	Err  error
 }
 
 type Connection struct {
-	addr string
+	addr   string
 	sendCh <-chan []byte
-	conn net.Conn
-	bw *bufio.Writer
+	conn   net.Conn
+	bw     *bufio.Writer
 }
 
 func NewConnection(addr string, sendCh <-chan []byte) *Connection {
 	conn := &Connection{
-		addr: addr,
+		addr:   addr,
 		sendCh: sendCh}
 	return conn
 }
@@ -42,9 +42,9 @@ func (c *Connection) Run() {
 			c.conn, err = net.Dial("tcp", c.addr)
 			if err != nil {
 				log.With(log.F{
-						"addr": c.addr,
-						"err": err,
-						}).Err("can't connect to peer")
+					"addr": c.addr,
+					"err":  err,
+				}).Err("can't connect to peer")
 				time.Sleep(time.Second)
 				continue
 			}
@@ -63,9 +63,9 @@ func (c *Connection) Run() {
 		}
 		if err != nil {
 			log.With(log.F{
-					"addr": c.addr,
-					"err": err,
-					}).Err("can't send message")
+				"addr": c.addr,
+				"err":  err,
+			}).Err("can't send message")
 			c.conn.Close()
 			c.conn = nil
 		}
@@ -74,15 +74,15 @@ func (c *Connection) Run() {
 
 type RecvData struct {
 	Conn net.Conn
-	Msg []byte
+	Msg  []byte
 }
 
 type DFNetwork struct {
-	handler MessageHandler
-	addrs map[string]*AddrData
-	recvCh chan RecvData
+	handler     MessageHandler
+	addrs       map[string]*AddrData
+	recvCh      chan RecvData
 	acceptErrCh chan error
-	mu sync.Mutex
+	mu          sync.Mutex
 }
 
 type dfMessageHandler struct {
@@ -105,7 +105,7 @@ func (n *DFNetwork) SetMessageHandler(handler MessageHandler) {
 	n.handler = handler
 }
 
-func (n* DFNetwork) getSendChannel(addr string) chan<-[]byte {
+func (n *DFNetwork) getSendChannel(addr string) chan<- []byte {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	var sendCh chan []byte
@@ -123,7 +123,7 @@ func (n* DFNetwork) getSendChannel(addr string) chan<-[]byte {
 
 func (n *DFNetwork) SendMessage(addr string, message []byte) {
 	select {
-	case n.getSendChannel(addr)<-message:
+	case n.getSendChannel(addr) <- message:
 	default:
 	}
 }
@@ -154,9 +154,9 @@ func (n *DFNetwork) Run(addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.With(log.F{
-				"addr": addr,
-				"err": err,
-				}).Err("listen failed")
+			"addr": addr,
+			"err":  err,
+		}).Err("listen failed")
 		return err
 	}
 	defer ln.Close()
@@ -170,14 +170,14 @@ func (n *DFNetwork) Run(addr string) error {
 			}
 			go n.handleConn(conn)
 		}
-	} ()
+	}()
 
 	for {
 		err = n.ProcessEvent()
 		if err != nil {
 			log.With(log.F{
-					"err": err,
-					}).Err("ProcessEvent error")
+				"err": err,
+			}).Err("ProcessEvent error")
 			return err
 		}
 	}
@@ -194,8 +194,8 @@ func (n *DFNetwork) ProcessEvent() error {
 		return nil
 	case acceptErr := <-n.acceptErrCh:
 		log.With(log.F{
-				"err": acceptErr,
-				}).Err("accept fail")
+			"err": acceptErr,
+		}).Err("accept fail")
 		return err
 	}
 	panic("not reach")
