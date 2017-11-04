@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package store;
+
+message PaxosState {
+	uint64 InstanceID = 1;
+	uint64 PromisedBallot = 2;
+	uint64 AcceptedBallot = 3;
+	bytes  AcceptedValue = 4;
+}
+

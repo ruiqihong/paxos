@@ -7,5 +7,6 @@ type MessageHandler interface {
 type Network interface {
 	Run(addr string) error
 	SendMessage(addr string, msg []byte)
+	BroadcastMessage(addrs []string, msg []byte)
 	SetMessageHandler(handler MessageHandler)
 }

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package comm;
+
+enum MsgType {
+	PAXOS_MSG_TYPE_UNKNOWN       = 0;
+	PAXOS_MSG_TYPE_PREPARE       = 1;
+	PAXOS_MSG_TYPE_PREPARE_REPLY = 2;
+	PAXOS_MSG_TYPE_ACCEPT        = 3;
+	PAXOS_MSG_TYPE_ACCEPT_REPLY  = 4;
+}
+
+message PrepareMsg {
+	uint32 NodeID = 1;
+	uint32 ProposalID = 2;
+	uint64 InstanceID = 3;
+}
+
+message PrepareReplyMsg {
+	uint32 NodeID = 1;
+	uint32 ProposalID = 2;
+	uint64 InstanceID = 3;
+
+	uint32 PreAcceptProposalID = 4;
+	uint32 PreAcceptNodeID = 5;
+	bytes  PreAcceptValue = 6;
+
+	uint32 RejectByPromiseID = 7;
+}
+
+message AcceptMsg {
+	uint32 NodeID = 1;
+	uint32 ProposalID = 2;
+	uint64 InstanceID = 3;
+	bytes  Value = 4;
+}
+
+message AcceptReplyMsg {
+	uint32 NodeID = 1;
+	uint32 ProposalID = 2;
+	uint64 InstanceID = 3;
+
+	uint32 RejectByPromiseID = 4;
+}
+
+message UnknownMsg {
+}

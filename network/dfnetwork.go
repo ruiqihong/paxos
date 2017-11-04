@@ -77,7 +77,7 @@ type RecvData struct {
 	Msg  []byte
 }
 
-type DFNetwork struct {
+type DefaultNetwork struct {
 	handler     MessageHandler
 	addrs       map[string]*AddrData
 	recvCh      chan RecvData
@@ -92,8 +92,8 @@ func (dfMessageHandler) OnMessage(msg []byte) error {
 	return nil
 }
 
-func NewDFNetwork() *DFNetwork {
-	network := new(DFNetwork)
+func NewDefaultNetwork() *DefaultNetwork {
+	network := new(DefaultNetwork)
 	network.handler = dfMessageHandler{}
 	network.addrs = make(map[string]*AddrData)
 	network.recvCh = make(chan RecvData, 1024)
@@ -101,11 +101,11 @@ func NewDFNetwork() *DFNetwork {
 	return network
 }
 
-func (n *DFNetwork) SetMessageHandler(handler MessageHandler) {
+func (n *DefaultNetwork) SetMessageHandler(handler MessageHandler) {
 	n.handler = handler
 }
 
-func (n *DFNetwork) getSendChannel(addr string) chan<- []byte {
+func (n *DefaultNetwork) getSendChannel(addr string) chan<- []byte {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	var sendCh chan []byte
@@ -121,14 +121,20 @@ func (n *DFNetwork) getSendChannel(addr string) chan<- []byte {
 	return sendCh
 }
 
-func (n *DFNetwork) SendMessage(addr string, message []byte) {
+func (n *DefaultNetwork) SendMessage(addr string, msg []byte) {
 	select {
-	case n.getSendChannel(addr) <- message:
+	case n.getSendChannel(addr) <- msg:
 	default:
 	}
 }
 
-func (n *DFNetwork) handleConn(conn net.Conn) {
+func (n *DefaultNetwork) BroadcastMessage(addrs []string, msg []byte) {
+	for _, addr := range addrs {
+		n.SendMessage(addr, msg)
+	}
+}
+
+func (n *DefaultNetwork) handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	var err error
@@ -137,12 +143,14 @@ func (n *DFNetwork) handleConn(conn net.Conn) {
 		size := uint32(0)
 		err = binary.Read(br, binary.BigEndian, &size)
 		if err != nil {
+			log.With(log.F{"from": conn.RemoteAddr(), "err": err}).Err("read from conn failed")
 			conn.Close()
 			break
 		}
 		msg := make([]byte, size)
 		_, err = io.ReadFull(br, msg)
 		if err != nil {
+			log.With(log.F{"from": conn.RemoteAddr(), "err": err}).Err("read from conn failed")
 			conn.Close()
 			break
 		}
@@ -150,7 +158,7 @@ func (n *DFNetwork) handleConn(conn net.Conn) {
 	}
 }
 
-func (n *DFNetwork) Run(addr string) error {
+func (n *DefaultNetwork) Run(addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.With(log.F{
@@ -162,12 +170,14 @@ func (n *DFNetwork) Run(addr string) error {
 	defer ln.Close()
 
 	go func() {
+		log.With(log.F{"addr": addr}).Info("network start listening")
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				n.acceptErrCh <- err
 				break
 			}
+			log.With(log.F{"from": conn.RemoteAddr()}).Debug("accept connection")
 			go n.handleConn(conn)
 		}
 	}()
@@ -183,10 +193,11 @@ func (n *DFNetwork) Run(addr string) error {
 	}
 }
 
-func (n *DFNetwork) ProcessEvent() error {
+func (n *DefaultNetwork) ProcessEvent() error {
 	var err error
 	select {
 	case recvData := <-n.recvCh:
+		log.With(log.F{"size": len(recvData.Msg), "addr": recvData.Conn.RemoteAddr()}).Debug("recv msg")
 		err = n.handler.OnMessage(recvData.Msg)
 		if err != nil {
 			recvData.Conn.Close()
